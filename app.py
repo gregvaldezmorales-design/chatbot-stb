@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from groq import Groq
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-client = Groq(api_key="gsk_TU_API_KEY_AQUI")
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 SISTEMA = """
 Eres el asistente virtual de Soluciones Tecnológicas Bocatoreñas, 
