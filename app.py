@@ -4,15 +4,17 @@ from groq import Groq
 import os
 
 app = Flask(__name__)
-CORS(app)
+# CORS configurado para permitir peticiones desde cualquier origen (importante para Byethost)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Configuración del cliente Groq 
-# Asegúrate de configurar GROQ_API_KEY en las variables de entorno de tu servidor o local
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+# Configuración del cliente Groq
+# Recuerda que GROQ_API_KEY debe estar en las "Environment Variables" de Render
+api_key = os.environ.get("GROQ_API_KEY")
+client = Groq(api_key=api_key)
 
 SISTEMA = """
-Eres el asistente virtual de Soluciones Tecnológicas Bocatoreñas, 
-ubicada en Bocas del Toro, Panamá.
+Eres el asistente virtual de ROADED (antes Soluciones Tecnológicas Bocatoreñas), 
+ubicada en Changuinola, Bocas del Toro, Panamá.
 
 Información importante para el cliente:
 - Precios de Cursos y Servicios:
@@ -25,42 +27,60 @@ Información importante para el cliente:
     * Email: gregvaldezmorales@gmail.com
 
 Servicios adicionales que ofreces:
-- Curso de Arduino y Robótica
-- Programación de Robots
-- Servicio de Diseño Web
-- Soporte y Reparación de equipos físicos
+- Curso de Arduino y Robótica (STEAM)
+- Programación de Robots y mantenimiento preventivo
+- Servicio de Diseño Web y Software Personalizado
+- Soporte y Reparación de equipos físicos (PC, Laptops)
 
 Instrucciones de comportamiento:
 - Responde siempre en español, de forma amable, breve y profesional.
-- Usa emojis de forma moderada para ser cercano.
-- Si el usuario pregunta por algo fuera de estos servicios, invítalo a escribir al WhatsApp o al email mencionados.
+- Usa emojis de forma moderada.
+- Si el usuario pregunta por algo fuera de estos servicios, invítalo a escribir al WhatsApp o al email.
 """
 
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
+        # Verificar que la API KEY existe
+        if not api_key:
+            return jsonify({'respuesta': 'Error: API Key no configurada en el servidor.'}), 500
+
         data = request.get_json()
+        if not data:
+            return jsonify({'respuesta': 'Error: No se enviaron datos válidos.'}), 400
+            
         mensaje = data.get('mensaje', '')
 
         if not mensaje:
-            return jsonify({'error': 'No se proporcionó un mensaje'}), 400
+            return jsonify({'respuesta': 'Por favor, escribe un mensaje para poder ayudarte.'}), 400
 
-        respuesta = client.chat.completions.create(
+        # Llamada a Groq con manejo de errores específico
+        completion = client.chat.completions.create(
             model="llama3-8b-8192",
             messages=[
                 {"role": "system", "content": SISTEMA},
                 {"role": "user", "content": mensaje}
-            ]
+            ],
+            temperature=0.7,
+            max_tokens=500
         )
 
+        # Extraer respuesta de forma segura
+        respuesta_texto = completion.choices[0].message.content
+
         return jsonify({
-            'respuesta': respuesta.choices[0].message.content
+            'respuesta': respuesta_texto
         })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error detectado: {str(e)}")
+        return jsonify({'respuesta': 'Lo siento, tuve un problema interno. Inténtalo de nuevo en un momento.'}), 500
+
+# Ruta de prueba para verificar que el servidor está vivo
+@app.route('/')
+def health_check():
+    return "Servidor ROADED en funcionamiento", 200
 
 if __name__ == '__main__':
-    # Usar el puerto que asigne el servidor o el 5000 por defecto
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port)
